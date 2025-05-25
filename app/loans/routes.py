@@ -37,7 +37,8 @@ loans_bp = Blueprint("loans", __name__, url_prefix="/api/loans")
 def assign_book():
     """Assign a book to a user."""
     data = request.get_json() or {}
-    book = Book.query.get(data.get("book_id"))
+    # Using db.session.get() instead of Query.get()
+    book = db.session.get(Book, data.get("book_id"))
     if not book or not book.available:
         return jsonify({"msg": "Book not available"}), 400
 
@@ -83,7 +84,8 @@ def return_book(book_id):
         return jsonify({"msg": "No active loan"}), 400
 
     loan.returned = True
-    book = Book.query.get(book_id)
+    # Using db.session.get() instead of Query.get()
+    book = db.session.get(Book, book_id)
     book.available = True
     db.session.commit()
     return jsonify({"msg": "Book returned"}), 200
