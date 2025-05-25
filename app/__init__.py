@@ -2,6 +2,7 @@ from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
 from flask_bcrypt import Bcrypt
 from flask_jwt_extended import JWTManager
+from flasgger import Swagger
 
 # extensions
 db = SQLAlchemy()
@@ -17,8 +18,12 @@ def create_app():
     bcrypt.init_app(app)
     jwt.init_app(app)
 
-    # add is_admin claim to JWT
-    from flask_jwt_extended import verify_jwt_in_request, get_jwt
+    # swagger
+    Swagger(app)
+
+    from flask_jwt_extended import get_jwt
+    from flask_jwt_extended import verify_jwt_in_request
+
     @jwt.additional_claims_loader
     def add_claims(identity):
         from app.models import User
