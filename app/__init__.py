@@ -30,7 +30,8 @@ def create_app():
         # In tests, we directly provide the claims
         from app.models import User
         try:
-            user = User.query.get(identity)
+            # Using Session.get() instead of Query.get() to fix SQLAlchemy warning
+            user = db.session.get(User, identity)
             if user:
                 return {"is_admin": user.is_admin}
         except Exception:
