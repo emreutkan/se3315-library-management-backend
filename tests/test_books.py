@@ -6,7 +6,7 @@ def test_list_books_success(client, admin_token):
     books = res.get_json()
     assert isinstance(books, list)
     # the seeded book is present
-    assert any(b["isbn"] == "seed-123" for b in books)
+    assert any(b["title"] == "SeedBook" for b in books)
 
 def test_add_book_forbidden(client, user_token):
     res = client.post("/api/books", json={
@@ -22,9 +22,15 @@ def test_add_book_success(client, admin_token):
     b = res.get_json()
     assert b["isbn"] == "isbn-456"
 
-def test_add_book_conflict(client, admin_token):
-    # adding the same ISBN again
+def test_add_book_conflict(client, admin_token, app):
+    # First, get the seeded book's ISBN
+    with app.app_context():
+        from app.models import Book
+        seeded_book = Book.query.filter_by(title="SeedBook").first()
+        seeded_isbn = seeded_book.isbn
+
+    # Try to add a book with that ISBN
     res = client.post("/api/books", json={
-        "title":"Dup","author":"Auth","isbn":"seed-123","category":"Cat"
+        "title":"Dup","author":"Auth","isbn": seeded_isbn,"category":"Cat"
     }, headers={"Authorization": f"Bearer {admin_token}"})
     assert res.status_code == 400

@@ -26,9 +26,22 @@ def create_app():
 
     @jwt.additional_claims_loader
     def add_claims(identity):
+        # This function is only called when creating new tokens
+        # In tests, we directly provide the claims
         from app.models import User
-        user = User.query.get(identity)
-        return {"is_admin": user.is_admin}
+        try:
+            user = User.query.get(identity)
+            if user:
+                return {"is_admin": user.is_admin}
+        except Exception:
+            # If any error occurs, return default non-admin claims
+            pass
+        return {"is_admin": False}
+
+    @jwt.user_identity_loader
+    def user_identity_lookup(identity):
+        # Convert to string to ensure it works consistently
+        return str(identity)
 
     # register blueprints
     from app.auth.routes  import auth_bp

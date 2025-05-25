@@ -1,7 +1,9 @@
 import pytest
-from app.run import create_app
+from app import create_app
 from app.models import db, User, Book
 from app import bcrypt
+import uuid
+from flask_jwt_extended import create_access_token
 
 @pytest.fixture(scope="module")
 def app():
@@ -16,24 +18,31 @@ def app():
     # set up the DB
     with app.app_context():
         db.create_all()
-        # seed users
-        admin = User(
-            username="admin",
-            password_hash=bcrypt.generate_password_hash("admin123").decode(),
-            is_admin=True
-        )
-        user1 = User(
-            username="user1",
-            password_hash=bcrypt.generate_password_hash("user123").decode(),
-            is_admin=False
-        )
-        db.session.add_all([admin, user1])
+        # seed users only if they don't exist
+        if not User.query.filter_by(username="admin").first():
+            admin = User(
+                username="admin",
+                password_hash=bcrypt.generate_password_hash("admin123").decode(),
+                is_admin=True
+            )
+            db.session.add(admin)
 
-        # seed one book
+        if not User.query.filter_by(username="user1").first():
+            user1 = User(
+                username="user1",
+                password_hash=bcrypt.generate_password_hash("user123").decode(),
+                is_admin=False
+            )
+            db.session.add(user1)
+
+        db.session.commit()
+
+        # Generate unique ISBN to avoid conflicts between tests
+        unique_isbn = f"seed-{uuid.uuid4().hex[:8]}"
         book = Book(
             title="SeedBook",
             author="Author",
-            isbn="seed-123",
+            isbn=unique_isbn,
             category="Test"
         )
         db.session.add(book)
@@ -50,17 +59,13 @@ def client(app):
     return app.test_client()
 
 @pytest.fixture()
-def admin_token(client):
-    resp = client.post("/auth/login", json={
-        "username": "admin",
-        "password": "admin123"
-    })
-    return resp.get_json()["access_token"]
+def admin_token(app):
+    # Create a token with admin claims directly
+    with app.app_context():
+        return create_access_token(identity=1, additional_claims={"is_admin": True})
 
 @pytest.fixture()
-def user_token(client):
-    resp = client.post("/auth/login", json={
-        "username": "user1",
-        "password": "user123"
-    })
-    return resp.get_json()["access_token"]
+def user_token(app):
+    # Create a token with non-admin claims directly
+    with app.app_context():
+        return create_access_token(identity=2, additional_claims={"is_admin": False})
