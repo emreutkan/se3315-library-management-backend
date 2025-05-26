@@ -14,12 +14,7 @@ auth_bp = Blueprint("auth", __name__, url_prefix="/api/auth")
             'in': 'body',
             'name': 'credentials',
             'schema': {
-                'type': 'object',
-                'required': ['username', 'password'],
-                'properties': {
-                    'username': {'type': 'string'},
-                    'password': {'type': 'string'}
-                }
+                '$ref': '#/definitions/LoginCredentials'
             }
         }
     ],
@@ -27,14 +22,13 @@ auth_bp = Blueprint("auth", __name__, url_prefix="/api/auth")
         200: {
             'description': 'Access token',
             'schema': {
-                'type': 'object',
-                'properties': {
-                    'access_token': {'type': 'string'}
-                }
+                '$ref': '#/definitions/Token'
             }
         },
         401: {'description': 'Bad credentials'}
-    }
+    },
+    'summary': 'Obtain JWT token for API authentication',
+    'description': 'Use this endpoint to get a JWT token. After obtaining the token, click the "Authorize" button at the top of the page, enter "Bearer YOUR_TOKEN" in the value field, and click "Authorize" to enable testing of protected endpoints.'
 })
 def login():
     """Authenticate user and return JWT."""
@@ -45,3 +39,19 @@ def login():
 
     access_token = create_access_token(identity=user.id)
     return jsonify(access_token=access_token), 200
+
+@auth_bp.route("/test-auth", methods=["GET"])
+@swag_from({
+    'tags': ['Authentication'],
+    'security': [{'Bearer': []}],
+    'responses': {
+        200: {'description': 'Authentication successful'},
+        401: {'description': 'Authentication failed'}
+    },
+    'summary': 'Test if your token is valid',
+    'description': 'Use this endpoint to verify if your JWT token is working properly. This endpoint requires authentication.'
+})
+def test_auth():
+    """Test endpoint requiring authentication."""
+    return jsonify({"msg": "Authentication successful"}), 200
+

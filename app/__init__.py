@@ -2,6 +2,7 @@ from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
 from flask_bcrypt import Bcrypt
 from flask_jwt_extended import JWTManager
+from flask_cors import CORS
 from flasgger import Swagger
 
 # extensions
@@ -13,46 +14,98 @@ def create_app():
     app = Flask(__name__)
     app.config.from_object("config.Config")
 
+    # Enable CORS for all routes
+    CORS(app, resources={r"/api/*": {"origins": "*"}})
+
     # init extensions
     db.init_app(app)
     bcrypt.init_app(app)
     jwt.init_app(app)
 
-    # swagger
-    Swagger(app)
+    # swagger configuration with definitions
+    swagger_config = {
+        "headers": [],
+        "specs": [
+            {
+                "endpoint": "apispec",
+                "route": "/apispec.json",
+                "rule_filter": lambda rule: True,  # all in
+                "model_filter": lambda tag: True,  # all in
+            }
+        ],
+        "static_url_path": "/flasgger_static",
+        "swagger_ui": True,
+        "specs_route": "/apidocs/",
+    }
 
-    from flask_jwt_extended import get_jwt
-    from flask_jwt_extended import verify_jwt_in_request
+    swagger_template = {
+        "swagger": "2.0",
+        "info": {
+            "title": "Library Management System API",
+            "description": "API for managing books, users, and loans",
+            "version": "1.0"
+        },
+        # Add authentication section to template
+        "securityDefinitions": {
+            "Bearer": {
+                "type": "apiKey",
+                "name": "Authorization",
+                "in": "header",
+                "description": "JWT Authorization header using the Bearer scheme. Example: \"Bearer {token}\""
+            }
+        },
+        "security": [
+            {"Bearer": []}
+        ],
+        "definitions": {
+            "Book": {
+                "type": "object",
+                "properties": {
+                    "id": {"type": "integer"},
+                    "title": {"type": "string"},
+                    "author": {"type": "string"},
+                    "isbn": {"type": "string"},
+                    "category": {"type": "string"},
+                    "available": {"type": "boolean"},
+                    "due_date": {"type": "string", "format": "date", "description": "Return date for borrowed books"},
+                    "is_overdue": {"type": "boolean", "description": "Indicates if the book is past its due date"}
+                }
+            },
+            "User": {
+                "type": "object",
+                "properties": {
+                    "id": {"type": "integer"},
+                    "username": {"type": "string"},
+                    "is_admin": {"type": "boolean"}
+                }
+            },
+            "BorrowedBook": {
+                "type": "object",
+                "properties": {
+                    "id": {"type": "integer"},
+                    "user_id": {"type": "integer"},
+                    "book_id": {"type": "integer"},
+                    "return_date": {"type": "string", "format": "date"},
+                    "returned": {"type": "boolean"},
+                    "is_overdue": {"type": "boolean"}
+                }
+            },
+            "LoginCredentials": {
+                "type": "object",
+                "properties": {
+                    "username": {"type": "string", "example": "admin"},
+                    "password": {"type": "string", "example": "admin123"}
+                },
+                "required": ["username", "password"]
+            },
+            "Token": {
+                "type": "object",
+                "properties": {
+                    "access_token": {"type": "string"}
+                }
+            }
+        }
+    }
 
-    @jwt.additional_claims_loader
-    def add_claims(identity):
-        # This function is only called when creating new tokens
-        # In tests, we directly provide the claims
-        from app.models import User
-        try:
-            # Using Session.get() instead of Query.get() to fix SQLAlchemy warning
-            user = db.session.get(User, identity)
-            if user:
-                return {"is_admin": user.is_admin}
-        except Exception:
-            # If any error occurs, return default non-admin claims
-            pass
-        return {"is_admin": False}
+    Swagger(app, config=swagger_config, template=swagger_template)
 
-    @jwt.user_identity_loader
-    def user_identity_lookup(identity):
-        # Convert to string to ensure it works consistently
-        return str(identity)
-
-    # register blueprints
-    from app.auth.routes  import auth_bp
-    from app.users.routes import users_bp
-    from app.books.routes import books_bp
-    from app.loans.routes import loans_bp
-
-    app.register_blueprint(auth_bp)
-    app.register_blueprint(users_bp)
-    app.register_blueprint(books_bp)
-    app.register_blueprint(loans_bp)
-
-    return app

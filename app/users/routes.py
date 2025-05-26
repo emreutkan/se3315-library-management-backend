@@ -72,3 +72,50 @@ def add_user():
     db.session.add(user)
     db.session.commit()
     return jsonify(user.to_dict()), 201
+
+@users_bp.route("/search", methods=["GET"])
+@jwt_required()
+@admin_required
+@swag_from({
+    'tags': ['Users'],
+    'parameters': [
+        {
+            'name': 'username',
+            'in': 'query',
+            'type': 'string',
+            'required': False,
+            'description': 'Username to search for (partial match)'
+        },
+        {
+            'name': 'is_admin',
+            'in': 'query',
+            'type': 'boolean',
+            'required': False,
+            'description': 'Filter by admin status'
+        }
+    ],
+    'responses': {
+        200: {
+            'description': 'List of matching users',
+            'schema': {
+                'type': 'array',
+                'items': {'$ref': '#/definitions/User'}
+            }
+        },
+        403: {'description': 'Admin privilege required'}
+    }
+})
+def search_users():
+    """Search for users by username."""
+    query = User.query
+
+    # Apply filters based on query parameters
+    if request.args.get('username'):
+        query = query.filter(User.username.ilike(f'%{request.args.get("username")}%'))
+
+    if 'is_admin' in request.args:
+        is_admin = request.args.get('is_admin').lower() in ('true', '1', 't')
+        query = query.filter(User.is_admin == is_admin)
+
+    users = query.all()
+    return jsonify([u.to_dict() for u in users])
