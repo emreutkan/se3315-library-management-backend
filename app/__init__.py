@@ -34,25 +34,26 @@ def create_app():
     bcrypt.init_app(app)
     jwt.init_app(app)
 
+    # Import models here to ensure they are registered before create_all()
+    from app import models # Import all models
+
     # Initialize database with tables and admin user
     with app.app_context():
         app.logger.info("Creating database tables if they don't exist")
         db.create_all()
         app.logger.info("Database tables created successfully")
 
-        # Import User model here to avoid circular imports
-        from app.models import User
-
+        # User model is now available via models.User
         try:
             # Use a simple count query first to verify the table exists
-            user_count = db.session.query(db.func.count(User.id)).scalar()
+            user_count = db.session.query(db.func.count(models.User.id)).scalar()
             app.logger.info(f"Found {user_count} existing users")
 
             # Only after confirming the table works, check for admin
-            admin_user = User.query.filter_by(username="admin").first()
+            admin_user = models.User.query.filter_by(username="admin").first()
             if not admin_user:
                 app.logger.info("Creating admin user")
-                admin_user = User(
+                admin_user = models.User(
                     username="admin",
                     password_hash=bcrypt.generate_password_hash("admin123").decode('utf-8'),
                     is_admin=True
