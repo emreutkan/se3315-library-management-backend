@@ -1,8 +1,10 @@
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, current_app
 from flask_jwt_extended import create_access_token
 from flasgger import swag_from
 from app.models import User
 from app import bcrypt
+import os
+import traceback
 
 auth_bp = Blueprint("auth", __name__, url_prefix="/api/auth")
 
@@ -32,13 +34,43 @@ auth_bp = Blueprint("auth", __name__, url_prefix="/api/auth")
 })
 def login():
     """Authenticate user and return JWT."""
-    data = request.get_json() or {}
-    user = User.query.filter_by(username=data.get("username")).first()
-    if not user or not bcrypt.check_password_hash(user.password_hash, data.get("password", "")):
-        return jsonify({"msg": "Bad credentials"}), 401
+    try:
+        # Log request details for debugging
+        current_app.logger.info("Login attempt received")
 
-    access_token = create_access_token(identity=user.id)
-    return jsonify(access_token=access_token), 200
+        # Check database connection
+        try:
+            user_count = User.query.count()
+            current_app.logger.info(f"Database connection successful. User count: {user_count}")
+        except Exception as db_error:
+            current_app.logger.error(f"Database error: {str(db_error)}")
+            return jsonify({"error": "Database connection error", "details": str(db_error)}), 500
+
+        # Check database file existence (for SQLite)
+        if 'sqlite:///' in current_app.config['SQLALCHEMY_DATABASE_URI']:
+            db_path = current_app.config['SQLALCHEMY_DATABASE_URI'].replace('sqlite:///', '')
+            if not os.path.isabs(db_path):
+                # Make path absolute if it's relative
+                db_path = os.path.join(current_app.root_path, '..', db_path)
+
+            current_app.logger.info(f"Database path: {db_path}")
+            current_app.logger.info(f"Database exists: {os.path.exists(db_path)}")
+
+        data = request.get_json() or {}
+        current_app.logger.info(f"Login attempt for user: {data.get('username')}")
+
+        user = User.query.filter_by(username=data.get("username")).first()
+        if not user or not bcrypt.check_password_hash(user.password_hash, data.get("password", "")):
+            current_app.logger.info("Authentication failed: bad credentials")
+            return jsonify({"msg": "Bad credentials"}), 401
+
+        access_token = create_access_token(identity=user.id)
+        current_app.logger.info(f"Authentication successful for user: {user.username}")
+        return jsonify(access_token=access_token), 200
+    except Exception as e:
+        current_app.logger.error(f"Unexpected error in login: {str(e)}")
+        current_app.logger.error(traceback.format_exc())
+        return jsonify({"error": "Internal server error", "details": str(e)}), 500
 
 @auth_bp.route("/test-auth", methods=["GET"])
 @swag_from({

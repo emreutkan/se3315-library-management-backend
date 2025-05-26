@@ -4,6 +4,7 @@ from flask_bcrypt import Bcrypt
 from flask_jwt_extended import JWTManager
 from flask_cors import CORS
 from flasgger import Swagger
+import logging
 
 # extensions
 db = SQLAlchemy()
@@ -14,6 +15,17 @@ def create_app():
     app = Flask(__name__)
     app.config.from_object("config.Config")
 
+    # Setup logging
+    logging.basicConfig(level=logging.INFO)
+    app.logger.info("Starting library management system")
+
+    # Log the database URI (without exposing sensitive info)
+    db_uri = app.config['SQLALCHEMY_DATABASE_URI']
+    if 'sqlite:///' in db_uri:
+        app.logger.info(f"Using SQLite database at: {db_uri.replace('sqlite:///', '')}")
+    else:
+        app.logger.info("Using database connection from environment variable")
+
     # Enable CORS for all routes
     CORS(app, resources={r"/api/*": {"origins": "*"}})
 
@@ -21,6 +33,29 @@ def create_app():
     db.init_app(app)
     bcrypt.init_app(app)
     jwt.init_app(app)
+
+    # Initialize database with tables and admin user
+    with app.app_context():
+        app.logger.info("Creating database tables if they don't exist")
+        db.create_all()
+
+        # Import User model here to avoid circular imports
+        from app.models import User
+
+        # Check if admin user exists, create if not
+        admin_user = User.query.filter_by(username="admin").first()
+        if not admin_user:
+            app.logger.info("Creating admin user")
+            admin_user = User(
+                username="admin",
+                password_hash=bcrypt.generate_password_hash("admin123").decode('utf-8'),
+                is_admin=True
+            )
+            db.session.add(admin_user)
+            db.session.commit()
+            app.logger.info("Admin user created successfully")
+        else:
+            app.logger.info("Admin user already exists")
 
     # swagger configuration with definitions
     swagger_config = {
