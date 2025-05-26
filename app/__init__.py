@@ -109,3 +109,16 @@ def create_app():
 
     Swagger(app, config=swagger_config, template=swagger_template)
 
+    # Register blueprints
+    from app.auth import auth_bp
+    from app.books import books_bp
+    from app.loans import loans_bp
+    from app.users import users_bp
+
+    app.register_blueprint(auth_bp)
+    app.register_blueprint(books_bp)
+    app.register_blueprint(loans_bp)
+    app.register_blueprint(users_bp)
+
+    # Return the Flask application
+    return app
