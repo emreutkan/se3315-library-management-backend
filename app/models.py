@@ -2,6 +2,7 @@ from datetime import date
 from app import db
 
 class User(db.Model):
+    __tablename__ = 'user'  # Explicitly define the table name
     id            = db.Column(db.Integer, primary_key=True)
     username      = db.Column(db.String(80), unique=True, nullable=False)
     password_hash = db.Column(db.String(128), nullable=False)
@@ -15,6 +16,7 @@ class User(db.Model):
         }
 
 class Book(db.Model):
+    __tablename__ = 'book'  # Explicitly define the table name
     id        = db.Column(db.Integer, primary_key=True)
     title     = db.Column(db.String(200), nullable=False)
     author    = db.Column(db.String(120), nullable=False)
@@ -43,6 +45,7 @@ class Book(db.Model):
         return result
 
 class BorrowedBook(db.Model):
+    __tablename__ = 'borrowed_book'  # Explicitly define the table name
     id          = db.Column(db.Integer, primary_key=True)
     user_id     = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
     book_id     = db.Column(db.Integer, db.ForeignKey("book.id"), nullable=False)
