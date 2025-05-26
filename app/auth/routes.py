@@ -64,8 +64,18 @@ def login():
             current_app.logger.info("Authentication failed: bad credentials")
             return jsonify({"msg": "Bad credentials"}), 401
 
-        # Explicitly convert user ID to string to avoid JWT subject issues
-        access_token = create_access_token(identity=str(user.id))
+        # Add additional claims to the token including is_admin flag
+        additional_claims = {
+            'is_admin': user.is_admin,
+            'username': user.username
+        }
+
+        # Create token with the additional claims
+        access_token = create_access_token(
+            identity=str(user.id),
+            additional_claims=additional_claims
+        )
+
         current_app.logger.info(f"Authentication successful for user: {user.username}")
         return jsonify(access_token=access_token), 200
     except Exception as e:
