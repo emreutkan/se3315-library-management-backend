@@ -38,24 +38,34 @@ def create_app():
     with app.app_context():
         app.logger.info("Creating database tables if they don't exist")
         db.create_all()
+        app.logger.info("Database tables created successfully")
 
         # Import User model here to avoid circular imports
         from app.models import User
 
-        # Check if admin user exists, create if not
-        admin_user = User.query.filter_by(username="admin").first()
-        if not admin_user:
-            app.logger.info("Creating admin user")
-            admin_user = User(
-                username="admin",
-                password_hash=bcrypt.generate_password_hash("admin123").decode('utf-8'),
-                is_admin=True
-            )
-            db.session.add(admin_user)
-            db.session.commit()
-            app.logger.info("Admin user created successfully")
-        else:
-            app.logger.info("Admin user already exists")
+        try:
+            # Use a simple count query first to verify the table exists
+            user_count = db.session.query(db.func.count(User.id)).scalar()
+            app.logger.info(f"Found {user_count} existing users")
+
+            # Only after confirming the table works, check for admin
+            admin_user = User.query.filter_by(username="admin").first()
+            if not admin_user:
+                app.logger.info("Creating admin user")
+                admin_user = User(
+                    username="admin",
+                    password_hash=bcrypt.generate_password_hash("admin123").decode('utf-8'),
+                    is_admin=True
+                )
+                db.session.add(admin_user)
+                db.session.commit()
+                app.logger.info("Admin user created successfully")
+            else:
+                app.logger.info("Admin user already exists")
+        except Exception as e:
+            app.logger.error(f"Error during database initialization: {str(e)}")
+            # Continue app initialization despite DB errors
+            # This allows the app to start and show proper error messages
 
     # swagger configuration with definitions
     swagger_config = {
